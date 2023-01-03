@@ -1,0 +1,12 @@
+[package]
+name = "smp"
+version = "0.0.1"
+authors = ["Devknot <devknot.asm@gmail.com>"]
+readme = "README.md"
+license = "MIT"
+license-file = "license"
+edition = "2021"
+description = " "
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
