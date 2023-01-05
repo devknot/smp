@@ -1,43 +1,69 @@
-#![feature(allocator_api)]
+//const BLOCK: usize = 256;
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
-/*
-pub struct Shield<Data, Heap = std::alloc::Global>
+use std::{
+	alloc::{Layout, alloc_zeroed, dealloc},
+	marker::Sized,
+	mem::align_of,
+	ops::Drop,
+};
+
+pub struct Shield<const BLOCK: usize, Data>
 where
-	Data: std::marker::Sized,
-	Heap: std::alloc::Allocator,
+	Data: Sized,
 {
-    ptr: *mut Data,
-    alloc: Heap,
+	block: *mut Data,
     addr: usize,
+    layout: Layout,
 }
 
-impl Shield {
-	fn new() {
-		std::mem::size_of::<Data>()
+impl <const BLOCK: usize, Data> Shield<BLOCK, Data>
+where
+	Data: Sized,
+{
+	pub fn new() -> Self {
+		let layout = Layout::from_size_align(
+			BLOCK,
+			align_of::<Data>(),
+		).unwrap();
+		
+		let ptr = unsafe{
+			alloc_zeroed(layout)
+		};
+		
+		let block = ptr as *mut Data;
+		let addr = 0;
+		
+		Self{
+			block,
+			addr,
+			layout,
+		}
+		
 	}
 }
-*/
 
-const BLOCK: usize = 256;
-
-pub struct Shield<Data>
+impl <const BLOCK: usize, Data> Drop for Shield<BLOCK, Data>
 where
-	Data: std::marker::Sized + std::marker::Copy + Default,
+	Data: Sized,
 {
-	block: [Data; BLOCK],
-    addr: usize,
+	fn drop(&mut self) {
+		unsafe{
+			dealloc(self.block as *mut u8, self.layout);
+		}
+	}
 }
 
+/*
+#[derive(Debug, PartialEq)]
 enum Error {
 	Address,
 }
 
+//impl std::error::Error for Error {}
+
 impl <Data> Shield<Data>
 where
-	Data: std::marker::Sized + std::marker::Copy + Default,
+	Data: std::marker::Sized + Default + std::marker::Copy,
 {
 	fn new(addr: usize) -> Self {
 		Self{
@@ -84,10 +110,24 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    /*
     #[test]
     fn it_works() {
         let result = add(2, 2);
         assert_eq!(result, 4);
     }
+    */
+    
+    #[test]
+    fn test_error_addrress() {
+    	let mut d: Shield<u8> = Shield::new(0);
+    	
+    	assert_eq!(d.swap(BLOCK+1), Err(Error::Address));
+    	
+    }
+    
 }
+*/
+
+
+
