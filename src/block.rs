@@ -13,7 +13,7 @@ use crate::error::{Result, Error};
 pub struct Shield<const BLOCK: usize, Data, Random>
 where
 	Data: Sized,
-	Random: rand::Rng,
+	Random: rand::RngCore,
 {
 	block: *mut Data,
     addr: usize,
@@ -24,7 +24,7 @@ where
 impl <const BLOCK: usize, Data, Random> Shield<BLOCK, Data, Random>
 where
 	Data: Sized,
-	Random: rand::Rng,
+	Random: rand::RngCore,
 {
 	pub fn new(value: Data, mut generator: Random) -> Result<Self> {
 		let layout = match Layout::from_size_align(
@@ -45,16 +45,13 @@ where
 		
 		let block = ptr as *mut Data;
 		
-		let addr = generator.gen::<usize>() % BLOCK;
+		let addr = generator.next_u64() as usize % BLOCK;
 		
 		let part = unsafe{
 			slice::from_raw_parts_mut(block, BLOCK)
 		};
 		
 		part[addr] = value;
-		
-		
-		//block[addr] = value;
 		
 		Ok(Self{
 			block,
@@ -67,7 +64,7 @@ where
 	
 	fn swap(&mut self) -> Result<usize> {
 		
-		let new_addr = self.generator.gen::<usize>() % BLOCK;
+		let new_addr = self.generator.next_u64() as usize % BLOCK;
 		
 		let part = unsafe{
 			slice::from_raw_parts_mut(self.block, BLOCK)
@@ -109,7 +106,7 @@ where
 		Ok(())
 	}
 	
-	fn as_ref<'shield>(&self) -> &'shield Data {
+	pub fn as_ref<'shield>(&self) -> &'shield Data {
 		let part = unsafe{
 			slice::from_raw_parts_mut(self.block, BLOCK)
 		};
@@ -118,7 +115,7 @@ where
 		
 	}
 	
-	fn as_ref_mut<'shield>(&self) -> &'shield mut Data {
+	pub fn as_ref_mut<'shield>(&self) -> &'shield mut Data {
 		let part = unsafe{
 			slice::from_raw_parts_mut(self.block, BLOCK)
 		};
@@ -131,7 +128,7 @@ where
 impl <const BLOCK: usize, Data, Random> Drop for Shield<BLOCK, Data, Random>
 where
 	Data: Sized,
-	Random: rand::Rng,
+	Random: rand::RngCore,
 {
 	fn drop(&mut self) {
 		unsafe{
