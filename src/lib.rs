@@ -120,6 +120,14 @@ where
 		
 	}
 	
+	fn as_ref_mut<'shield>(&self) -> &'shield mut Data {
+		let part = unsafe{
+			slice::from_raw_parts_mut(self.block, BLOCK)
+		};
+		
+		&mut part[self.addr]
+	}
+	
 }
 
 impl <const BLOCK: usize, Data, Random> Drop for Shield<BLOCK, Data, Random>
