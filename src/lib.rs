@@ -49,7 +49,7 @@ where
 		
 		let addr = generator.gen::<usize>() % BLOCK;
 		
-		let mut part = unsafe{
+		let part = unsafe{
 			slice::from_raw_parts_mut(block, BLOCK)
 		};
 		
@@ -71,7 +71,7 @@ where
 		
 		let new_addr = self.generator.gen::<usize>() % BLOCK;
 		
-		let mut part = unsafe{
+		let part = unsafe{
 			slice::from_raw_parts_mut(self.block, BLOCK)
 		};
 		
@@ -96,7 +96,7 @@ where
 			return Err(Error::Address);
 		}
 		
-		let mut part = unsafe{
+		let part = unsafe{
 			slice::from_raw_parts_mut(self.block, BLOCK)
 		};
 		
@@ -111,6 +111,14 @@ where
 		Ok(())
 	}
 	
+	fn as_ref<'shield>(&self) -> &'shield Data {
+		let part = unsafe{
+			slice::from_raw_parts_mut(self.block, BLOCK)
+		};
+		
+		&part[self.addr]
+		
+	}
 	
 }
 
@@ -128,7 +136,7 @@ where
 
 
 #[derive(Debug, PartialEq)]
-enum Error {
+pub enum Error {
 	Address,
 	Alloc,
 	Layout(LayoutError),
