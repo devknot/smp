@@ -5,7 +5,9 @@ use std::{
 	marker::Sized,
 	mem::align_of,
 	ops::Drop,
+	ptr,
 	slice,
+	mem,
 };
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -53,6 +55,9 @@ where
 		
 		part[addr] = value;
 		
+		
+		//block[addr] = value;
+		
 		Ok(Self{
 			block,
 			addr,
@@ -61,6 +66,52 @@ where
 		})
 		
 	}
+	
+	fn swap(&mut self) -> Result<usize> {
+		
+		let new_addr = self.generator.gen::<usize>() % BLOCK;
+		
+		let mut part = unsafe{
+			slice::from_raw_parts_mut(self.block, BLOCK)
+		};
+		
+		unsafe{
+			ptr::copy(
+				&part[self.addr] as *const Data,
+				&mut part[new_addr] as *mut Data,
+				1,
+			)
+		}
+		
+		let tmp = self.addr;
+		
+		self.addr = new_addr;
+		
+		Ok(tmp)
+		
+	}
+	
+	fn clear(&mut self, addr: usize) -> Result<()> {
+		if addr >= BLOCK {
+			return Err(Error::Address);
+		}
+		
+		let mut part = unsafe{
+			slice::from_raw_parts_mut(self.block, BLOCK)
+		};
+		
+		unsafe {
+			std::ptr::write_bytes(
+				&mut part[addr] as *mut Data,
+				0x0,
+				mem::size_of::<Data>(),
+			)
+		}
+		
+		Ok(())
+	}
+	
+	
 }
 
 impl <const BLOCK: usize, Data, Random> Drop for Shield<BLOCK, Data, Random>
