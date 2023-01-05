@@ -1,50 +1,72 @@
 //const BLOCK: usize = 256;
 
 use std::{
-	alloc::{Layout, alloc_zeroed, dealloc},
+	alloc::{Layout, LayoutError, alloc_zeroed, dealloc},
 	marker::Sized,
 	mem::align_of,
 	ops::Drop,
+	slice,
 };
 
-pub struct Shield<const BLOCK: usize, Data>
+pub type Result<T> = std::result::Result<T, Error>;
+
+pub struct Shield<const BLOCK: usize, Data, Random>
 where
 	Data: Sized,
+	Random: rand::Rng,
 {
 	block: *mut Data,
     addr: usize,
     layout: Layout,
+    generator: Random,
 }
 
-impl <const BLOCK: usize, Data> Shield<BLOCK, Data>
+impl <const BLOCK: usize, Data, Random> Shield<BLOCK, Data, Random>
 where
 	Data: Sized,
+	Random: rand::Rng,
 {
-	pub fn new() -> Self {
-		let layout = Layout::from_size_align(
+	pub fn new(value: Data, mut generator: Random) -> Result<Self> {
+		let layout = match Layout::from_size_align(
 			BLOCK,
 			align_of::<Data>(),
-		).unwrap();
+		){
+			Ok(value) => value,
+			Err(error) => return Err(Error::Layout(error)),
+		};
 		
 		let ptr = unsafe{
 			alloc_zeroed(layout)
 		};
 		
-		let block = ptr as *mut Data;
-		let addr = 0;
+		if ptr.is_null() {
+			return Err(Error::Alloc);
+		}
 		
-		Self{
+		let block = ptr as *mut Data;
+		
+		let addr = generator.gen::<usize>() % BLOCK;
+		
+		let mut part = unsafe{
+			slice::from_raw_parts_mut(block, BLOCK)
+		};
+		
+		part[addr] = value;
+		
+		Ok(Self{
 			block,
 			addr,
 			layout,
-		}
+			generator,
+		})
 		
 	}
 }
 
-impl <const BLOCK: usize, Data> Drop for Shield<BLOCK, Data>
+impl <const BLOCK: usize, Data, Random> Drop for Shield<BLOCK, Data, Random>
 where
 	Data: Sized,
+	Random: rand::Rng,
 {
 	fn drop(&mut self) {
 		unsafe{
@@ -53,12 +75,14 @@ where
 	}
 }
 
-/*
+
 #[derive(Debug, PartialEq)]
 enum Error {
 	Address,
+	Alloc,
+	Layout(LayoutError),
 }
-
+/*
 //impl std::error::Error for Error {}
 
 impl <Data> Shield<Data>
