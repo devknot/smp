@@ -6,7 +6,7 @@ usa da biblioteca random para gerar um número entre o 0 até `BLOCK` -1 do `Shi
 
 uso:
 
-'''
+```
 use smp::block::Shield;
 
 use rand::{rngs::StdRng, SeedableRng};
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	
 	Ok(())   
 }
-'''
+```
 
 
 
