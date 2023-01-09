@@ -3,12 +3,17 @@ pub mod error;
 
 pub mod block;
 
-use crate::block::Shield;
+pub use crate::block::Shield;
+pub use crate::error::Error;
 
 use rand::{rngs::StdRng, SeedableRng};
 
 const BLOCK: usize = 256;
 
+/// lib
+/// sdfjvjsd
+/// ''' dec '''
+/// ``` fdfg ```
 
 #[cfg(test)]
 mod tests {

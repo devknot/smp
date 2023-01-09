@@ -6,19 +6,18 @@ usa da biblioteca random para gerar um número entre o 0 até `BLOCK` -1 do `Shi
 
 uso:
 
-```
+```rust
 use smp::block::Shield;
 
 use rand::{rngs::StdRng, SeedableRng};
 
-const BLOCK: usize = 256;
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-
-	let block: Shield<BLOCK, u8, StdRng> = 
-	Shield::new(8, StdRng::from_entropy()).unwrap();
 	
-	println!("{}", block.as_ref());
+	let mut block = Shield::new(8, StdRng::from_entropy());
+	
+	block.map(|x| {
+		println!("{x}");
+	});
 	
 	Ok(())   
 }

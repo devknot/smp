@@ -1,139 +1,170 @@
 use std::{
-	alloc::{Layout, LayoutError, alloc_zeroed, dealloc},
-	marker::Sized,
-	mem::align_of,
-	ops::Drop,
-	ptr,
-	slice,
-	mem,
+	marker::Copy,
+	convert::{AsRef, AsMut},
+	sync::{Arc, Mutex, LockResult, MutexGuard},
+	ops::{Deref, DerefMut},
+	cell::RefCell,
+	error::Error,
 };
 
-use crate::error::{Result, Error};
+use rand::Rng;
 
-pub struct Shield<const BLOCK: usize, Data, Random>
+use crate::error;
+
+
+const BLOCK: usize = 256;
+
+
+pub struct Shield<Data, Random>
 where
-	Data: Sized,
-	Random: rand::RngCore,
+	Data: Default + Copy,
+	Random: Rng,
 {
-	block: *mut Data,
-    addr: usize,
-    layout: Layout,
-    generator: Random,
+	block: [Data; BLOCK],
+	addr: usize,
+	generator: Random,
 }
 
-impl <const BLOCK: usize, Data, Random> Shield<BLOCK, Data, Random>
+
+
+
+impl <D, R> Shield<D, R>
 where
-	Data: Sized,
-	Random: rand::RngCore,
+	D: Default + Copy,
+	R: Rng,
 {
-	pub fn new(value: Data, mut generator: Random) -> Result<Self> {
-		let layout = match Layout::from_size_align(
-			BLOCK,
-			align_of::<Data>(),
-		){
-			Ok(value) => value,
-			Err(error) => return Err(Error::Layout(error)),
-		};
+	pub fn new(value: D, mut generator: R) -> Self {
+		let mut block = [D::default(); BLOCK];
 		
-		let ptr = unsafe{
-			alloc_zeroed(layout)
-		};
+		let addr = generator.gen_range(0..BLOCK);
 		
-		if ptr.is_null() {
-			return Err(Error::Alloc);
-		}
+		block[addr] = value;
 		
-		let block = ptr as *mut Data;
-		
-		let addr = generator.next_u64() as usize % BLOCK;
-		
-		let part = unsafe{
-			slice::from_raw_parts_mut(block, BLOCK)
-		};
-		
-		part[addr] = value;
-		
-		Ok(Self{
+		Self{
 			block,
 			addr,
-			layout,
 			generator,
-		})
+		}
 		
 	}
 	
-	fn swap(&mut self) -> Result<usize> {
+	fn take(&mut self){
 		
-		let new_addr = self.generator.next_u64() as usize % BLOCK;
+		let new_addr = self.generator.gen_range(0..BLOCK);
 		
-		let part = unsafe{
-			slice::from_raw_parts_mut(self.block, BLOCK)
-		};
+		let tmp = self.block[self.addr];
 		
-		unsafe{
-			ptr::copy(
-				&part[self.addr] as *const Data,
-				&mut part[new_addr] as *mut Data,
-				1,
-			)
-		}
+		self.block[new_addr] = tmp;
 		
-		let tmp = self.addr;
+		self.clear(self.addr);
 		
 		self.addr = new_addr;
+	}
+	
+	fn clear(&mut self, addr: usize) {
+		self.block[addr] = D::default();
+	}
+	
+	
+	pub fn map<F, U>(&mut self, function: F) -> U
+	where
+		F: FnOnce(&D) -> U,
+	{
+		self.take();
 		
-		Ok(tmp)
+		function(&self.block[self.addr])
 		
 	}
 	
-	fn clear(&mut self, addr: usize) -> Result<()> {
-		if addr >= BLOCK {
-			return Err(Error::Address);
-		}
+	/*
+	pub fn map_mut<F, U>(&mut self, function: F) -> U
+	where
+		F: FnOnce(&mut D) -> U,
+	{
+		self.take();
 		
-		let part = unsafe{
-			slice::from_raw_parts_mut(self.block, BLOCK)
+		function(&mut self.block[self.addr])
+		
+	}
+	*/
+	/*
+	pub fn guard(&mut self) -> Guard<'_, D, R> {
+		self.take();
+		Guard::new(Arc::new(Mutex::new(self)))
+	}
+	
+	*/
+	
+}
+
+/*
+pub struct Guard<'guard, D, R>
+where
+	D: Default + Copy,
+	R: Rng,
+{
+	reference: Arc< Mutex <&'guard mut Shield<D, R> > >,
+}
+
+
+impl <'guard, D, R> Guard<'guard, D, R>
+where
+	D: Default + Copy,
+	R: Rng,
+{
+	fn new(reference: Arc< Mutex <&'guard mut Shield<D, R> > >) -> Self {
+		Self{
+			reference,
+		}
+	}
+	
+	pub fn map<F, U, T>(
+		&mut self,
+		function: F,
+	) -> Result<(), error::Error> //Response
+	where
+		F: Fn(&D) -> U,
+	{
+		//function(&self.reference)
+		
+		let mut guard = match self.reference.lock() {
+			Ok(lock) => lock,
+			Err(_) => return Err(error::Error::PoisonError),
 		};
 		
-		unsafe {
-			std::ptr::write_bytes(
-				&mut part[addr] as *mut Data,
-				0x0,
-				mem::size_of::<Data>(),
-			)
-		}
+		guard.take();
 		
 		Ok(())
-	}
-	
-	pub fn as_ref<'shield>(&self) -> &'shield Data {
-		let part = unsafe{
-			slice::from_raw_parts_mut(self.block, BLOCK)
-		};
-		
-		&part[self.addr]
-		
-	}
-	
-	pub fn as_ref_mut<'shield>(&self) -> &'shield mut Data {
-		let part = unsafe{
-			slice::from_raw_parts_mut(self.block, BLOCK)
-		};
-		
-		&mut part[self.addr]
+		//&self.reference.borrow_mut();
 	}
 	
 }
+*/
 
-impl <const BLOCK: usize, Data, Random> Drop for Shield<BLOCK, Data, Random>
+/*
+impl <'guard, D, R> Guard<'guard, D, R>
 where
-	Data: Sized,
-	Random: rand::RngCore,
+	D: Default + Copy,
+	R: Rng,
 {
-	fn drop(&mut self) {
-		unsafe{
-			dealloc(self.block as *mut u8, self.layout);
+	pub fn action<Function, Response>(
+		self,
+		function: Function,
+	) -> ()
+	where
+		Function: Fn(&D) -> Response,
+	{
+		//function(&self.reference)
+		
+		let a = RefCell::into_inner(self.reference);
+		//&self.reference.borrow_mut();
+	}
+	
+	fn new(reference: RefCell<&'guard Shield<D, R>>) -> Self {
+		Self{
+			reference,
 		}
 	}
+	
 }
-
+*/

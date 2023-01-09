@@ -1,27 +1,21 @@
-use std::{
-	alloc::LayoutError,
-	fmt,
-};
+use std::{error, fmt, result};
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-	Address,
-	Alloc,
-	Layout(LayoutError),
+	Unknown,
+	PoisonError,
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = result::Result<T, Error>;
 
 impl fmt::Display for Error {
 	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write!(formatter, "{}", match self {
-			Error::Address => String::from("address not valid"),
-			Error::Alloc => String::from("can\'t allocate"),
-			Error::Layout(layout) => format!("{}", layout),
+			Error::Unknown => "unknown error",
+			Error::PoisonError => "poison error", 
 		})
 	}
 }
 
-impl std::error::Error for Error {}
-
+impl error::Error for Error {}
 
